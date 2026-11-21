@@ -267,13 +267,40 @@ export default function Home() {
             </div>
 
             <div className="border-t border-gray-700 mt-6 pt-4">
-              <h2 className="font-semibold mb-3 text-orange-500">Sprekers (dit blok)</h2>
-              <div className="space-y-1 mb-4 max-h-48 overflow-y-auto">
-                {speakers.map((s) => (
-                  <div key={s.id} className="flex items-center gap-1 group">
-                    <div className="flex-1 text-left px-3 py-2 rounded-lg text-sm bg-gray-800/50">{s.name}</div>
-                  </div>
-                ))}
+              <h2 className="font-semibold mb-3 text-orange-500"Sprekers (dit blok)</h2>
+<div className="space-y-1 mb-4 max-h-48 overflow-y-auto">
+  {speakers.map((s, index) => (
+    <div 
+      key={s.id} 
+      draggable
+      onDragStart={(e) => e.dataTransfer.setData('text/plain', index.toString())}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={async (e) => {
+        e.preventDefault();
+        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+        const toIndex = index;
+        if (fromIndex === toIndex) return;
+        const newSpeakers = [...speakers];
+        const [moved] = newSpeakers.splice(fromIndex, 1);
+        newSpeakers.splice(toIndex, 0, moved);
+        for (let i = 0; i < newSpeakers.length; i++) {
+          await supabase.from('speakers').update({ sort_order: i }).eq('id', newSpeakers[i].id);
+        }
+        setSpeakers(newSpeakers);
+      }}
+      className="flex items-center gap-1 group cursor-move"
+    >
+      <div className="flex-1 text-left px-3 py-2 rounded-lg text-sm bg-gray-800/50">{s.name}</div>
+      <button 
+        onClick={async () => {
+          await supabase.from('speakers').delete().eq('id', s.id);
+          setSpeakers(speakers.filter(sp => sp.id !== s.id));
+        }}
+        className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 text-lg px-1"
+      >×</button>
+    </div>
+  ))}
+</div>                ))}
               </div>
               <textarea value={speakerList} onChange={e => setSpeakerList(e.target.value)}
                 placeholder="Plak namen (één per regel)" className="w-full h-20 px-3 py-2 bg-gray-800 rounded text-sm border border-gray-700 resize-none" />
