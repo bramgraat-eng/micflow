@@ -27,7 +27,6 @@ export default function Home() {
   const [speakerList, setSpeakerList] = useState('');
   const [newBlock, setNewBlock] = useState({ name: '', start: '', end: '' });
   const [newProductionName, setNewProductionName] = useState('');
-  const [importText, setImportText] = useState('');
   const [loading, setLoading] = useState(true);
 
   const currentProd = productions.find(p => p.id === currentId) || productions[0];
@@ -130,49 +129,6 @@ export default function Home() {
     loadBlockData(activeBlockId);
   }
 
-  async function processImportText(text: string) {
-    if (!text.trim() || !currentId) return;
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    let currentBlockName = '';
-    let speakersForBlock: string[] = [];
-    const blocksToCreate: { name: string; speakers: string[] }[] = [];
-
-    for (const line of lines) {
-      if (line.match(/\d{1,2}:\d{2}/) || (line.length < 50 && !line.includes(','))) {
-        if (currentBlockName && speakersForBlock.length) {
-          blocksToCreate.push({ name: currentBlockName, speakers: [...speakersForBlock] });
-        }
-        currentBlockName = line.replace(/\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}/, '').trim() || line;
-        speakersForBlock = [];
-      } else {
-        speakersForBlock.push(line);
-      }
-    }
-    if (currentBlockName && speakersForBlock.length) {
-      blocksToCreate.push({ name: currentBlockName, speakers: speakersForBlock });
-    }
-
-    if (!blocksToCreate.length) return alert('Geen blokken herkend.');
-
-    for (const b of blocksToCreate) {
-      const { data: blockData } = await supabase.from('blocks').insert({ name: b.name, production_id: currentId }).select().single();
-      if (blockData) {
-        const inserts = b.speakers.map((name, i) => ({ name, block_id: blockData.id, sort_order: i }));
-        await supabase.from('speakers').insert(inserts);
-      }
-    }
-    loadBlocks(currentId);
-    alert(`Klaar! ${blocksToCreate.length} blok(ken) aangemaakt.`);
-  }
-
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !currentId) return;
-    const text = await file.text();
-    await processImportText(text);
-    e.target.value = '';
-  }
-
   async function setAssignment(micId: string, speaker: string | null) {
     if (!activeBlockId) return;
     if (speaker) {
@@ -242,21 +198,6 @@ export default function Home() {
       <div className="flex h-[calc(100vh-130px)]">
         {view !== 'foh' && (
           <aside className="w-80 bg-[#1F2937] border-r border-gray-700 p-4 overflow-y-auto">
-            {/* Draaiboek import */}
-            <div className="mb-6 p-3 bg-gray-800 rounded-lg">
-              <h3 className="text-sm font-medium mb-2 text-orange-400">Importeer draaiboek</h3>
-              <textarea value={importText} onChange={e => setImportText(e.target.value)}
-                placeholder="Plak hier tekst, of upload een bestand hieronder"
-                className="w-full h-24 px-3 py-2 bg-gray-900 rounded text-sm border border-gray-700 resize-none" />
-              <button onClick={() => processImportText(importText)} className="mt-2 w-full bg-orange-500 text-white py-1.5 rounded text-sm font-medium mb-2">
-                Importeer tekst
-              </button>
-              <label className="block w-full text-center bg-gray-700 hover:bg-gray-600 text-white py-1.5 rounded text-sm font-medium cursor-pointer">
-                Of upload Excel/CSV
-                <input type="file" accept=".xlsx,.xls,.csv,.txt" onChange={handleFileUpload} className="hidden" />
-              </label>
-            </div>
-
             <h2 className="font-semibold mb-3 text-orange-500">Blokken</h2>
             <div className="space-y-1 mb-6">
               {blocks.map((b, index) => (
