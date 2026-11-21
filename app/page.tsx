@@ -52,11 +52,23 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (currentId) loadBlocks(currentId);
+    if (currentId) {
+      setBlocks([]);
+      setSpeakers([]);
+      setAssignments({});
+      setStatuses({});
+      setActiveBlockId(null);
+      loadBlocks(currentId);
+    }
   }, [currentId]);
 
   useEffect(() => {
     if (activeBlockId) loadBlockData(activeBlockId);
+    else {
+      setSpeakers([]);
+      setAssignments({});
+      setStatuses({});
+    }
   }, [activeBlockId]);
 
   async function loadBlockData(blockId: string) {
@@ -247,12 +259,43 @@ export default function Home() {
 
             <h2 className="font-semibold mb-3 text-orange-500">Blokken</h2>
             <div className="space-y-1 mb-6">
-              {blocks.map(b => (
-                <button key={b.id} onClick={() => setActiveBlockId(b.id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm ${activeBlockId === b.id ? 'bg-orange-500/20 text-orange-400' : 'hover:bg-gray-700'}`}>
-                  <div className="font-medium">{b.name}</div>
-                  {(b.start_time || b.end_time) && <div className="text-xs text-gray-400">{b.start_time} – {b.end_time}</div>}
-                </button>
+              {blocks.map((b, index) => (
+                <div 
+                  key={b.id}
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData('text/plain', index.toString())}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                    const toIndex = index;
+                    if (fromIndex === toIndex) return;
+                    const newBlocks = [...blocks];
+                    const [moved] = newBlocks.splice(fromIndex, 1);
+                    newBlocks.splice(toIndex, 0, moved);
+                    for (let i = 0; i < newBlocks.length; i++) {
+                      await supabase.from('blocks').update({ sort_order: i }).eq('id', newBlocks[i].id);
+                    }
+                    setBlocks(newBlocks);
+                  }}
+                  className="flex items-center gap-1 group"
+                >
+                  <button onClick={() => setActiveBlockId(b.id)}
+                    className={`flex-1 text-left px-3 py-2 rounded-lg text-sm cursor-move ${activeBlockId === b.id ? 'bg-orange-500/20 text-orange-400' : 'hover:bg-gray-700'}`}>
+                    <div className="font-medium">{b.name}</div>
+                    {(b.start_time || b.end_time) && <div className="text-xs text-gray-400">{b.start_time} – {b.end_time}</div>}
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (!confirm(`Blok "${b.name}" verwijderen?`)) return;
+                      await supabase.from('blocks').delete().eq('id', b.id);
+                      const remaining = blocks.filter(bl => bl.id !== b.id);
+                      setBlocks(remaining);
+                      if (activeBlockId === b.id) setActiveBlockId(remaining[0]?.id || null);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 text-lg px-1"
+                  >×</button>
+                </div>
               ))}
             </div>
 
@@ -267,40 +310,39 @@ export default function Home() {
             </div>
 
             <div className="border-t border-gray-700 mt-6 pt-4">
-              <h2 className="font-semibold mb-3 text-orange-500"Sprekers (dit blok)</h2>
-<div className="space-y-1 mb-4 max-h-48 overflow-y-auto">
-  {speakers.map((s, index) => (
-    <div 
-      key={s.id} 
-      draggable
-      onDragStart={(e) => e.dataTransfer.setData('text/plain', index.toString())}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={async (e) => {
-        e.preventDefault();
-        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-        const toIndex = index;
-        if (fromIndex === toIndex) return;
-        const newSpeakers = [...speakers];
-        const [moved] = newSpeakers.splice(fromIndex, 1);
-        newSpeakers.splice(toIndex, 0, moved);
-        for (let i = 0; i < newSpeakers.length; i++) {
-          await supabase.from('speakers').update({ sort_order: i }).eq('id', newSpeakers[i].id);
-        }
-        setSpeakers(newSpeakers);
-      }}
-      className="flex items-center gap-1 group cursor-move"
-    >
-      <div className="flex-1 text-left px-3 py-2 rounded-lg text-sm bg-gray-800/50">{s.name}</div>
-      <button 
-        onClick={async () => {
-          await supabase.from('speakers').delete().eq('id', s.id);
-          setSpeakers(speakers.filter(sp => sp.id !== s.id));
-        }}
-        className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 text-lg px-1"
-      >×</button>
-    </div>
-  ))}
-</div>                ))}
+              <h2 className="font-semibold mb-3 text-orange-500">Sprekers (dit blok)</h2>
+              <div className="space-y-1 mb-4 max-h-48 overflow-y-auto">
+                {speakers.map((s, index) => (
+                  <div 
+                    key={s.id} 
+                    draggable
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', index.toString())}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                      const toIndex = index;
+                      if (fromIndex === toIndex) return;
+                      const newSpeakers = [...speakers];
+                      const [moved] = newSpeakers.splice(fromIndex, 1);
+                      newSpeakers.splice(toIndex, 0, moved);
+                      for (let i = 0; i < newSpeakers.length; i++) {
+                        await supabase.from('speakers').update({ sort_order: i }).eq('id', newSpeakers[i].id);
+                      }
+                      setSpeakers(newSpeakers);
+                    }}
+                    className="flex items-center gap-1 group cursor-move"
+                  >
+                    <div className="flex-1 text-left px-3 py-2 rounded-lg text-sm bg-gray-800/50">{s.name}</div>
+                    <button 
+                      onClick={async () => {
+                        await supabase.from('speakers').delete().eq('id', s.id);
+                        setSpeakers(speakers.filter(sp => sp.id !== s.id));
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 text-lg px-1"
+                    >×</button>
+                  </div>
+                ))}
               </div>
               <textarea value={speakerList} onChange={e => setSpeakerList(e.target.value)}
                 placeholder="Plak namen (één per regel)" className="w-full h-20 px-3 py-2 bg-gray-800 rounded text-sm border border-gray-700 resize-none" />
